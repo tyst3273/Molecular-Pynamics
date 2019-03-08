@@ -11,14 +11,14 @@ import copy as cp
 sig = 3.4
 a = 1.5496*sig/2.0 #scaling factor for integer basis array
 
-nx1 = int(raw_input('\tEnter number of unit cells of Ar in x:\n\t>'))
-nx2 = int(raw_input('\tEnter number of unit cells of heavy-Argon in x:\n\t>'))
-ny = int(raw_input('\tEnter width in y:\n\t>'))
-nz = int(raw_input('\tEnter width in z:\n\t>'))
+nx1 = int(raw_input('Enter number of unit cells of Ar in x:\n\t>'))
+nx2 = int(raw_input('Enter number of unit cells of heavy-Argon in x:\n\t>'))
+ny = int(raw_input('Enter width in y:\n\t>'))
+nz = int(raw_input('Enter width in z:\n\t>'))
 nx = nx1+nx2
-lammps = str(raw_input('\tEnter the name of the lammps data file or "none" if '
+lammps = str(raw_input('Enter the name of the lammps data file or "none" if '
                        'you dont want one\n\t>'))
-xyz = str(raw_input('\tEnter the name of the xyz data file or "none" if '
+xyz = str(raw_input('Enter the name of the xyz data file or "none" if '
                        'you dont want one\n\t>'))
 
 basis = np.array([[0,0,0],
@@ -67,7 +67,7 @@ ymax = pos[:,3].max()+buff
 zmin = pos[:,4].min()-buff
 zmax = pos[:,4].max()+buff
     
-if lammps != 'no':
+if lammps != 'none':
     with open(lammps,'w') as fid:
         fid.write('LAMMPS DATA FILE\n\n'+str(size)+' atoms\n\n'+str(types)+
                   ' atom types\n\n')
@@ -84,7 +84,7 @@ if lammps != 'no':
         fid.write(str(int(pos[-1,0]))+' '+str(int(pos[-1,1]))+' '+str(pos[-1,2])+
                       ' '+str(pos[-1,3])+' '+str(pos[-1,4]))
         
-if xyz != 'no':
+if xyz != 'none':
     with open(xyz,'w') as fid:
         fid.write(str(size)+'\n')
         fid.write(str(xmin)+' '+str(xmax)+' '+str(ymin)+' '+str(ymax)+' '+
