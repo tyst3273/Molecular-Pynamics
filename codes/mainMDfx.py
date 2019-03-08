@@ -17,12 +17,12 @@ import moduleMD as md
 
 ##### SIMULATION INPUTS #####
 infile = 'ArgonCluster32.xyz' #positions
-dump = 500
-thermo = 500
+dump = 50
+thermo = 50
 dist = 'mb' #velocity distribution
 val = 20 #Kelvin #argument for velocity sampling, see docstring
 dt = 0.002 #timestep in ps, nondimensionalized below
-tTot = 15 #ps 
+tTot = 10 #ps 
 ##############################
 
 
