@@ -18,6 +18,7 @@ sig = 3.40 #ang
 mass = 6.63e-26 #kg
 kb = 1.38064852e-23 #J/K
 
+
 ###################################################################
 def doPBC(rx,ry,rz,lx,ly,lz):
     """
@@ -44,7 +45,7 @@ def doPBC(rx,ry,rz,lx,ly,lz):
 
 
 ####################################
-def findNN(pos,num,pbc='no',box=0):
+def findNN(pos,num,pbc=False,box=0):
     """
     This function takes in a position array with elements [id, type, x,y,z]
     and find nearest neighbors for each atom in pos. NOTE: the ids in pos 
@@ -74,7 +75,7 @@ def findNN(pos,num,pbc='no',box=0):
     # needed to compute forces from LJ
     # the first index corresponds to each particle in pos, the next is
     # each other particle in pos, and the last are the x,y,z vectors
-    if pbc == 'yes':
+    if pbc == True:
         lx = box[0]/2 #distance to shift for pbc
         ly = box[1]/2
         lz = box[2]/2
@@ -85,10 +86,10 @@ def findNN(pos,num,pbc='no',box=0):
             rx = pos[j,2]-pos[i,2] # vector from partice i to j
             ry = pos[j,3]-pos[i,3] # vector from partice i to j
             rz = pos[j,4]-pos[i,4] # vector from partice i to j
-            if pbc == 'yes':
+            if pbc == True:
                 rx, ry, rz = doPBC(rx,ry,rz,lx,ly,lz)
             dist = np.sqrt(rx**2+ry**2+rz**2)
-            tmp[0,j] = pos[j,0] #id
+            tmp[0,j] = pos[j,0]-1 #index
             tmp[1,j] = dist #distance
             
             rij[i,j,0] = -rx
@@ -101,95 +102,45 @@ def findNN(pos,num,pbc='no',box=0):
     #nondimensional    
     return [nl, nd, rij] #return the neighbor lists
 ####################################
-   
     
+
 
 #######################################
-def verletList(num,pos,rcut,pbc='no',box=0):     
+def findRij(pos,vlist,pbc=False,box=0):
     """
-    Generate verlet lists for force cutoffs. Impose periodic boundary 
-    conditions if necessary.
+    This function calculates rij for all atoms in the verlet list
     """
-    nl, nd, rij = findNN(pos,num,pbc,box) #get NN to make neighborlist
-    vlist = [0]*num #verlet list
-    vcoord = [0]*num #verlet list
-    for i in range(num): #find neighbor lists
-        tmp = np.zeros((2,num))
-        tmp[0,:] = nl[i,:] #look up nn list
-        tmp[1,:] = nd[i,:] 
+    if pbc == True:
+        lx = box[0]/2 #distance to shift for pbc
+        ly = box[1]/2
+        lz = box[2]/2
         
-        tmp[:,:] = tmp[:,np.argsort(tmp[1,:])] #sort nn list
-        nns = tmp[0,np.argwhere(tmp[1,:] <= rcut)] #check cutoff against distance
-        
-        vlist[i] = nns
-        vcoord[i] = pos[nns[:,0].astype(int)-1,2:5] #coord of atoms in verlet list
-        
-    return [vlist, vcoord]
-
-def checkVerlet(num,pos,rcut,skin,vlist,vcoord,pbc='no',box=0):
-    """
-    Check if the current verlet list is still valid. If not, make new verlet
-    lists.
-    """
-    flag = False #True is Verlet list is no langer valid
-    for i in range(num):
-        if flag == True:
-            break
-        coords = pos[vlist[i][:,0].astype(int)-1,2:5] #current coord of atoms
-        maxdisp = np.abs(vcoord[i]-coords).max() #verlet list coords
-        if maxdisp >= skin: #check if it's moved beyond skin distance
-            flag = True #Verlet list is invalid
+    numNN = len(vlist)
+    rij = np.zeros((numNN,3))
+    nd = np.zeros(numNN)
+    i = int(vlist[0,0])
+    for j in range(numNN): #loop over neighbors
+        if j == 0:
+            rij[j,:] = 0
+            dist = 0
+        else:
+            k = int(vlist[j,0])
+            rx = pos[k,2]-pos[i,2] # vector from partice i to j
+            ry = pos[k,3]-pos[i,3] # vector from partice i to j
+            rz = pos[k,4]-pos[i,4] # vector from partice i to j
+            if pbc == True:
+                rx, ry, rz = doPBC(rx,ry,rz,lx,ly,lz)
+            dist = np.sqrt(rx**2+ry**2+rz**2)
             
-    if flag == True: #Generate new list
-        print('\tUpdating Verlet Lists!')
-        vlist, vcoord = verletList(num,pos,pbc,box)
-         
-    return [vlist, vcoord] #valid verlet list
-######################################
+            rij[j,0] = -rx
+            rij[j,1] = -ry
+            rij[j,2] = -rz
     
-
-
-#####################################
-def readXYZ(infile):
-    """
-    This function reads in positions from an xyz file and return 3 objects:
-    the total number of atoms 'num', the types and positions of atoms with rows
-    format [id,type, x, y, z] in 'pos', and the names of the types in 'types'
-    
-    It is assumed that .xyz coords are in angstrom
-    """
-    with open(infile,'r') as fid:
-        num = int(fid.readline()) #number of atoms
-        pos = np.zeros((num,3)) #positions 
-        types = np.zeros((num,1)).astype(str) #types of atoms, doesn't 
-        # matter now but will be useful when we have compounds
+        nd[j] = dist
         
-        box = np.array(fid.readline().strip().split()).astype(float) #box boundaries
-        box = box.reshape(3,2)
-        box = box[:,1]-box[:,0]
-        for i in range(num): #read in positions
-            tmp = fid.readline().strip().split()
-            types[i,0] = tmp[0]
-            pos[i,:] = tmp[1:4]
-            
-    utypes = np.unique(types) 
-    n = len(utypes) #number of species
-    tmp = np.zeros((num,1))
-    for i in range(n): #change types to numbers
-        tmp[np.argwhere(types[:,0] == utypes[i])] = i+1
-        
-    pos = np.append(tmp,pos,axis=1) #append types to pos
-    types = utypes.reshape(n,1)
-    pos = np.append(np.arange(1,num+1).reshape(num,1),pos,axis=1) 
-    #particle ids
-
-    #nondimensionalize    
-    pos[:,2:5] = pos[:,2:5]/sig #assumed to be angstroms
-    box = box/sig
-    
     #nondimensional    
-    return [num ,pos, types, box]
-###################################
+    return [nd, rij] #return the neighbor lists
+#######################################
     
 
 
@@ -242,7 +193,7 @@ def vInit(pos,dist='constant',val=0):
 
 
 ####################
-def fLJ(pos,num):
+def fLJ(pos,num,vlist,pbc,box):
     """
     This function computes the interparticle pairwise force from the LJ 
     potential as well as the interparticle and total potential energy.
@@ -253,22 +204,23 @@ def fLJ(pos,num):
     all particles, and all other particles for each, to calculate the forces
     and potential
     """
-    nl, nd, rij = findNN(pos,num)
-    
+
     fij = cp.deepcopy(pos) #to copy ids, types
     vij = cp.deepcopy(pos[:,0:3]) #to copy ids, types
     fij[:,2:5] = 0 #forces, same layout as pos and vels
     vij[:,2] = 0 #potential, same layout as pos and vels
     for i in range(num):
-        tmpf = np.zeros((num,3)) #tmp array to store forces
-        tmpv = np.zeros((1,num)) #tmp array to store PE
-        for j in range(num):
-            if i == j:
+        nd, rij = findRij(pos,vlist[i],pbc,box)
+        numNN = len(vlist[i])
+        tmpf = np.zeros((numNN,3)) #tmp array to store forces
+        tmpv = np.zeros((1,numNN)) #tmp array to store PE
+        for j in range(numNN):
+            if j == 0:
                 tmpf[j,:] = 0
                 tmpv[0,j] = 0
             else:
-                rv = rij[i,j,:] #vector from i to j
-                rd = nd[i,j]
+                rv = rij[j,:]
+                rd = nd[j]
                 tmpf[j,:] = (48/rd**2 * ((1/rd)**12 - 0.5*(1/rd)**6))*rv
                 # nondimensional
                 tmpv[0,j] = ( 4* ((1/rd)**12 - (1/rd)**6))
@@ -283,7 +235,7 @@ def fLJ(pos,num):
     
 
 ###################################
-def vVerlet(num,pos,vels,fij,dt):
+def vVerlet(num,pos,vels,fij,vlist,dt,pbc=False,box=0):
     """
     Use velocity verlet algorithm to update positions and velocities
     given initial positions, velocities, forces, and the time step.
@@ -310,7 +262,7 @@ def vVerlet(num,pos,vels,fij,dt):
             #x, y, and z based on velocity at half step
             
     ## Update the forces for the new positions
-    fij, vij, vTot = fLJ(pos,num)
+    fij, vij, vTot = fLJ(pos,num,vlist,pbc,box)
     
     ## Compute full step velocity
     for i in range(num): #loop over all atoms
@@ -321,7 +273,49 @@ def vVerlet(num,pos,vels,fij,dt):
             
     #nondimensional
     return [pos, vels, fij, vTot]
-##################################
+
+def verletList(num,pos,rcut,pbc=False,box=0):     
+    """
+    Generate verlet lists for force cutoffs. Impose periodic boundary 
+    conditions if necessary.
+    """
+    nl, nd, rij = findNN(pos,num,pbc,box) #get NN to make neighborlist
+    vlist = [0]*num #verlet list
+    vcoord = [0]*num #verlet list
+    for i in range(num): #find neighbor lists
+        tmp = np.zeros((2,num))
+        tmp[0,:] = nl[i,:] #look up nn list
+        tmp[1,:] = nd[i,:] 
+        
+        tmp[:,:] = tmp[:,np.argsort(tmp[1,:])] #sort nn list
+        nns = tmp[0,np.argwhere(tmp[1,:] <= rcut)] #check cutoff against distance
+        
+        vlist[i] = nns
+        vcoord[i] = pos[nns[:,0].astype(int),2:5] #coord of atoms in verlet list
+        
+    return [vlist, vcoord]
+
+
+def checkVerlet(num,pos,rcut,skin,vlist,vcoord,pbc=False,box=0):
+    """
+    Check if the current verlet list is still valid. If not, make new verlet
+    lists.
+    """
+    flag = False #True is Verlet list is no langer valid
+    for i in range(num):
+        if flag == True:
+            break
+        coords = pos[vlist[i][:,0].astype(int),2:5] #current coord of atoms
+        maxdisp = np.abs(vcoord[i]-coords).max() #verlet list coords
+        if maxdisp >= skin: #check if it's moved beyond skin distance
+            flag = True #Verlet list is invalid
+            
+    if flag == True: #Generate new list
+        print('\tUpdating Verlet Lists!')
+        vlist, vcoord = verletList(num,pos,rcut,pbc,box)
+         
+    return [vlist, vcoord] #valid verlet list
+######################################
     
 
 
@@ -335,6 +329,50 @@ def ndTime(dt):
     return dt
 #############################################
     
+
+
+#####################################
+def readXYZ(infile):
+    """
+    This function reads in positions from an xyz file and return 3 objects:
+    the total number of atoms 'num', the types and positions of atoms with rows
+    format [id,type, x, y, z] in 'pos', and the names of the types in 'types'
+    
+    It is assumed that .xyz coords are in angstrom
+    """
+    with open(infile,'r') as fid:
+        num = int(fid.readline()) #number of atoms
+        pos = np.zeros((num,3)) #positions 
+        types = np.zeros((num,1)).astype(str) #types of atoms, doesn't 
+        # matter now but will be useful when we have compounds
+        
+        box = np.array(fid.readline().strip().split()).astype(float) #box boundaries
+        box = box.reshape(3,2)
+        box = box[:,1]-box[:,0]
+        for i in range(num): #read in positions
+            tmp = fid.readline().strip().split()
+            types[i,0] = tmp[0]
+            pos[i,:] = tmp[1:4]
+            
+    utypes = np.unique(types) 
+    n = len(utypes) #number of species
+    tmp = np.zeros((num,1))
+    for i in range(n): #change types to numbers
+        tmp[np.argwhere(types[:,0] == utypes[i])] = i+1
+        
+    pos = np.append(tmp,pos,axis=1) #append types to pos
+    types = utypes.reshape(n,1)
+    pos = np.append(np.arange(1,num+1).reshape(num,1),pos,axis=1) 
+    #particle ids
+
+    #nondimensionalize    
+    pos[:,2:5] = pos[:,2:5]/sig #assumed to be angstroms
+    box = box/sig
+    
+    #nondimensional    
+    return [num ,pos, types, box]
+###################################
+
 
 
 ####################################
@@ -437,5 +475,26 @@ def toc():
                        startTime_for_tictoc,decimals=3))+" seconds.")
     else:
         print("\n\t\tToc: start time not set")
-
-
+################################################
+        
+        
+        
+###################################################
+def readLog(logfile):
+    """
+    Read the output log file from run into data structures
+    """
+    num = sum(1 for line in open(logfile,'r'))-2
+    
+    with open(logfile,'r') as fid:
+        col = fid.readline().strip().split()
+        ncol = len(col)
+        data =  np.zeros((num,ncol))
+        fid.readline()
+        
+        for i in range(num):
+            data[i,:] = fid.readline().strip().split()
+            
+    return data
+            
+            
