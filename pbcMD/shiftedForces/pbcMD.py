@@ -13,12 +13,12 @@ import functionsLJSF as md
 
 ##### SIMULATION INPUTS #####
 infile = 'liquid256.xyz' #positions
-dump = 50
+dump = 1000
 thermo = 2
 dist = 'mb' #velocity distribution
-val = 165 #Kelvin #argument for velocity sampling, see docstring
+val = 100 #Kelvin #argument for velocity sampling, see docstring
 dt = 0.002 #timestep in ps, nondimensionalized below
-tTot = 2 #ps 
+tTot = 200 #ps 
 
 rcut = 2.5 #cut off distance in units of sigma, neighbor sphere
 skin = 0.1 #verlet skin distance, units of sigma
@@ -35,7 +35,7 @@ steps = int(tTot/dt) #number of steps to run simulation
 dtMD = md.ndTime(dt) #nondimesnional timestep
 
 # Call function to read initial positions
-num, pos, types, box = md.readXYZ(infile) #non dimensional lj units
+num, pos, types, box, bounds = md.readXYZ(infile) #non dimensional lj units
 # Call function to initialize velocities 
 vels = md.vInit(pos,dist,val) #get initial velocites
 # Initialize verlet lists 
@@ -56,6 +56,7 @@ for k in range(steps): #run the MD simulation
     vlist, vcoord = md.checkVerlet(num,pos,rcut,skin,vlist,vcoord,box)
     
     pos, vels, fij, vTot = md.vVerlet(num,pos,rcut,vels,fij,vlist,dtMD,box)
+    pos = md.pbcCoords(num,pos,bounds,box)
     
     try: dump
     except NameError: dump = 'no'

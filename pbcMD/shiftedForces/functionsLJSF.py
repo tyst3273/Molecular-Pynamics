@@ -51,6 +51,36 @@ def doPBC(rx,ry,rz,lx,ly,lz):
         
     return [rx ,ry, rz]
 ######################################################################
+    
+############################################################
+def pbcCoords(num,pos,bounds,box):
+   """
+   Impose periodic boundary conditions to atom coordinates
+   """
+   lx = box[0] #distance to shift for pbc
+   ly = box[1]
+   lz = box[2]
+   
+   for i in range(num):
+      
+      if pos[i,2] <= bounds[0,0]:
+         pos[i,2] = pos[i,2]+lx
+      elif pos[i,2] > bounds[0,1]:
+         pos[i,2] = pos[i,2]-lx
+         
+      if pos[i,3] <= bounds[1,0]:
+         pos[i,3] = pos[i,3]+ly
+      elif pos[i,3] > bounds[1,1]:
+         pos[i,3] = pos[i,3]-ly
+         
+      if pos[i,4] <= bounds[2,0]:
+         pos[i,4] = pos[i,4]+lz
+      elif pos[i,4] > bounds[2,1]:
+         pos[i,4] = pos[i,4]-lz
+         
+   return pos
+   
+#################################################################
 
 ####################################
 def findNN(pos,num,box):
@@ -343,6 +373,7 @@ def readXYZ(infile):
         
         box = np.array(fid.readline().strip().split()).astype(float) #box boundaries
         box = box.reshape(3,2)
+        bounds = cp.deepcopy(box)
         box = box[:,1]-box[:,0]
         for i in range(num): #read in positions
             tmp = fid.readline().strip().split()
@@ -363,9 +394,10 @@ def readXYZ(infile):
     #nondimensionalize    
     pos[:,2:5] = pos[:,2:5]/sig #assumed to be angstroms
     box = box/sig
+    bounds = bounds/sig
     
     #nondimensional    
-    return [num ,pos, types, box]
+    return [num ,pos, types, box, bounds]
 ###################################
 
 ####################################
