@@ -36,7 +36,7 @@ steps = int(tTot/dt) #number of steps to run simulation
 dtMD = md.ndTime(dt) #nondimesnional timestep
 
 # Call function to read initial positions
-num, pos, types, box = md.readXYZ(infile) #non dimensional lj units
+num, pos, types, box, bounds = md.readXYZ(infile) #non dimensional lj units
 # Call function to initialize velocities 
 vels = md.vInit(pos,dist,val) #get initial velocites
 # Initialize verlet lists 
@@ -56,6 +56,7 @@ for k in range(steps): #run the MD simulation
     vlist, vcoord = md.checkVerlet(num,pos,rcut,skin,vlist,vcoord,box)
     
     pos, vels, fij, vTot = md.vVerlet(num,pos,vels,fij,vlist,dtMD,box)
+    pos = md.pbcCooIrds(num,pos,bounds,box)
     
     try: dump
     except NameError: dump = 'no'
