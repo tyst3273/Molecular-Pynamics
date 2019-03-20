@@ -13,12 +13,12 @@ import functionsLJSF as md
 
 ##### SIMULATION INPUTS #####
 infile = 'liquid256.xyz' #positions
-dump = 1000
-thermo = 2
+dump = 100
+thermo = 10
 dist = 'mb' #velocity distribution
 val = 100 #Kelvin #argument for velocity sampling, see docstring
 dt = 0.002 #timestep in ps, nondimensionalized below
-tTot = 200 #ps 
+tTot = 2 #200 #ps 
 
 rcut = 2.5 #cut off distance in units of sigma, neighbor sphere
 skin = 0.1 #verlet skin distance, units of sigma
@@ -52,17 +52,18 @@ for k in range(steps): #run the MD simulation
     if (k+1)%500 == 0:
         print(('\tNow on step:\t'+str(k+1)+' out of '+str(steps)))
         md.toc()
-        
+    # Check verlet list eachs step. Update when necessary,
     vlist, vcoord = md.checkVerlet(num,pos,rcut,skin,vlist,vcoord,box)
-    
+    # Velocity Verlet algorithm.
     pos, vels, fij, vTot = md.vVerlet(num,pos,rcut,vels,fij,vlist,dtMD,box)
+    # Impose periodic boundary conditions to particle positions.
     pos = md.pbcCoords(num,pos,bounds,box)
-    
+    # Write trajectory to file
     try: dump
     except NameError: dump = 'no'
     if type(dump) == int and (k+1)%dump == 0:
         md.dump(k,dump,num,pos,types)
-        
+    # Write thermodynamic outputs to file
     try: thermo
     except NameError: thermo = 'no'
     if type(thermo) == int and (k+1)%thermo == 0:
