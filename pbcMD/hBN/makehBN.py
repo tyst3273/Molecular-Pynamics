@@ -41,7 +41,7 @@ pos = pos.astype(float)
 pos[:,2] = pos[:,2]*ax/2 
 pos[:,3] = pos[:,3]*ay/6
 
-bx = ax/2.0
+bx = ax/4
 by = ay/6
 xmin = pos[:,2].min()-bx
 xmax = pos[:,2].max()+bx

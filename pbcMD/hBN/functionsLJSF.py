@@ -20,12 +20,16 @@ import sys
 
 eB = 0.002733 #eV
 eN = 0.001723 #eV
+eBN = np.sqrt(eB*eN) #eV
 sB = 3.4003 #A
 sN = 3.2177 #A 
+sBN = (sB+sN)/2 #A
 kb = 8.6173303e-5 #eV/K
 mB = 10.811 #AMU
 mN = 14.0067 #AMU
 kbSI = 1.38064852e-23 #J/K
+
+amu2kg = 1.66054e-27
 
 def printParams(num,steps,dt,tTot):
     """
@@ -209,8 +213,6 @@ def vInit(pos,dist='constant',val=0):
             
         x1 = np.random.uniform(0,1,int(num*3/2))
         x2 = np.random.uniform(0,1,int(num*3/2))
-#        y1 = (kbSI*val/mN*6.02214e26)**.5*(-2*np.log(x1))**.5*np.cos(2*np.pi*x2)
-#        y2 = (kbSI*val/mN*6.02214e26)**.5*(-2*np.log(x1))**.5*np.sin(2*np.pi*x2)
         y1 = (-2*np.log(x1))**.5*np.cos(2*np.pi*x2)
         y2 = (-2*np.log(x1))**.5*np.sin(2*np.pi*x2)
         num = len(pos[:,0])
@@ -252,17 +254,17 @@ def fLJ_SF(pos,num,rcut,vlist,box):
     verlet list. it then loops over all particles, and all other particles f
     or each, to calculate the forces and potential.
     """
-    vcBB = 4*(1/rcut**12-1/rcut**6) #potential at cutoff
-    dvdrBB = -48*((1/rcut)**13-0.5*(1/rcut**7)) #slope of potential at cutoff
-    fcBB = (48/rcut**2*((1/rcut)**12-0.5*(1/rcut)**6)) #force at cutoff
+    vcBB = 4*eB*((sB/rcut)**12-(sB/rcut)**6) #potential at cutoff
+    dvdrBB = -48*eB*((sB/rcut)**13-0.5*(sB/rcut**7)) #slope of potential at cutoff
+    fcBB = (48*eB/rcut**2*((sB/rcut)**12-0.5*(sB/rcut)**6)) #force at cutoff
     
-    vcNN = 4*(1/rcut**12-1/rcut**6) #potential at cutoff
-    dvdrNN = -48*((1/rcut)**13-0.5*(1/rcut**7)) #slope of potential at cutoff
-    fcNN = (48/rcut**2*((1/rcut)**12-0.5*(1/rcut)**6)) #force at cutoff
+    vcNN = 4*eN*((sN/rcut)**12-(sN/rcut)**6) #potential at cutoff
+    dvdrNN = -48*eN*((sN/rcut)**13-0.5*(sN/rcut**7)) #slope of potential at cutoff
+    fcNN = (48*eN/rcut**2*((sN/rcut)**12-0.5*(sN/rcut)**6)) #force at cutoff
     
-    vcBN = 4*(1/rcut**12-1/rcut**6) #potential at cutoff
-    dvdrBN = -48*((1/rcut)**13-0.5*(1/rcut**7)) #slope of potential at cutoff
-    fcBN = (48/rcut**2*((1/rcut)**12-0.5*(1/rcut)**6)) #force at cutoff
+    vcBN = 4*eBN*((sBN/rcut)**12-(sBN/rcut)**6) #potential at cutoff
+    dvdrBN = -48*eBN*((sBN/rcut)**13-0.5*(sBN/rcut**7)) #slope of potential at cutoff
+    fcBN = (48*eBN/rcut**2*((sBN/rcut)**12-0.5*(sBN/rcut)**6)) #force at cutoff
 
     fij = cp.deepcopy(pos) #to copy ids, types
     vij = cp.deepcopy(pos[:,0:3]) #to copy ids, types
@@ -283,26 +285,26 @@ def fLJ_SF(pos,num,rcut,vlist,box):
             elif pos[i,1] == 1 and pos[j,1] == 1:
                 rv = rij[j,:]
                 rd = nd[j]
-                tmpf[j,:] = ((48/rd**2*((1/rd)**12-0.5*(1/rd)**6))-fcBB)*rv
-                tmpv[0,j] = (4*((1/rd)**12-(1/rd)**6))-vcBB-(rd-rcut)*dvdrBB
+                tmpf[j,:] = ((48*eB/rd**2*((sB/rd)**12-0.5*(sB/rd)**6))-fcBB)*rv
+                tmpv[0,j] = (4*eB*((sB/rd)**12-(sB/rd)**6))-vcBB-(rd-rcut)*dvdrBB
                 
             elif pos[i,1] == 1 and pos[j,1] == 2:
                 rv = rij[j,:]
                 rd = nd[j]
-                tmpf[j,:] = ((48/rd**2*((1/rd)**12-0.5*(1/rd)**6))-fcBN)*rv
-                tmpv[0,j] = (4*((1/rd)**12-(1/rd)**6))-vcBN-(rd-rcut)*dvdrBN
+                tmpf[j,:] = ((48*eBN/rd**2*((sBN/rd)**12-0.5*(sBN/rd)**6))-fcBN)*rv
+                tmpv[0,j] = (4*eBN*((sBN/rd)**12-(sBN/rd)**6))-vcBN-(rd-rcut)*dvdrBN
                 
             elif pos[i,1] == 2 and pos[j,1] == 1:
                 rv = rij[j,:]
                 rd = nd[j]
-                tmpf[j,:] = ((48/rd**2*((1/rd)**12-0.5*(1/rd)**6))-fcBN)*rv
-                tmpv[0,j] = (4*((1/rd)**12-(1/rd)**6))-vcBN-(rd-rcut)*dvdrBN
+                tmpf[j,:] = ((48*eBN/rd**2*((sBN/rd)**12-0.5*(sBN/rd)**6))-fcBN)*rv
+                tmpv[0,j] = (4*eBN*((sBN/rd)**12-(sBN/rd)**6))-vcBN-(rd-rcut)*dvdrBN
                 
             else:
                 rv = rij[j,:]
                 rd = nd[j]
-                tmpf[j,:] = ((48/rd**2*((1/rd)**12-0.5*(1/rd)**6))-fcNN)*rv
-                tmpv[0,j] = (4*((1/rd)**12-(1/rd)**6))-vcNN-(rd-rcut)*dvdrNN
+                tmpf[j,:] = ((48*eN/rd**2*((sN/rd)**12-0.5*(sN/rd)**6))-fcNN)*rv
+                tmpv[0,j] = (4*eN*((sN/rd)**12-(sN/rd)**6))-vcNN-(rd-rcut)*dvdrNN
                 
         fij[i,2:5] = tmpf.sum(axis=0) 
         vij[i,2] = tmpv.sum() 
@@ -326,8 +328,12 @@ def vVerlet(num,pos,rcut,vels,fij,vlist,dt,box):
 
     ## Compute half step velocity
     for i in range(num): #loop over all atoms
+        if pos[i,1] == 1:
+           mass = mB
+        else:
+           mass = mN
         for j in range(3): #loop over x y z
-            vels[i,j+2] = vels[i,j+2]+dt*fij[i,j+2]/2.0
+            vels[i,j+2] = vels[i,j+2]+dt*fij[i,j+2]/2.0/mass
             #compute the velocity at the next half step for each atom in
             #x, y, and z
         
@@ -343,8 +349,12 @@ def vVerlet(num,pos,rcut,vels,fij,vlist,dt,box):
     
     ## Compute full step velocity
     for i in range(num): #loop over all atoms
+        if pos[i,1] == 1:
+           mass = mB
+        else:
+           mass = mN
         for j in range(3): #loop over x y z
-            vels[i,j+2] = vels[i,j+2]+dt*fij[i,j+2]/2.0
+            vels[i,j+2] = vels[i,j+2]+dt*fij[i,j+2]/2.0/mass
             #compute the velocity at the next half step for each atom in
             #x, y, and z
             
@@ -418,9 +428,10 @@ def readXYZ(infile):
     utypes = np.unique(types) 
     n = len(utypes) #number of species
     tmp = np.zeros((num,1))
-    for i in range(n): #change types to numbers
-        tmp[np.argwhere(types[:,0] == utypes[i])] = i+1
-        
+    
+    tmp[np.argwhere(types[:,0] == 'B')] = 1
+    tmp[np.argwhere(types[:,0] == 'N')] = 2
+      
     pos = np.append(tmp,pos,axis=1) #append types to pos
     types = utypes.reshape(n,1)
     pos = np.append(np.arange(1,num+1).reshape(num,1),pos,axis=1) 
@@ -438,7 +449,7 @@ def dump(k,dump,num,pos,types):
     The rest is behind the scenes.
     """
     cpos = cp.deepcopy(pos)
-    cpos[:,2:5] = cpos[:,2:5]*sig
+    cpos[:,2:5] = cpos[:,2:5]
     
     if k+1 == dump: #if the first step, erase the file. 
         with open('traj.xyz','w') as fid: #write pos trajectory to file
@@ -471,20 +482,31 @@ def thermo(k,thermo,vels,vTot):
         
     Writes to file 'log.MD' with frequency thermo
     """
-    j2ev = 6.242e18
+#    j2ev = 6.242e18
     num = len(vels[:,0])
-    ke = np.multiply(vels[:,2:5],vels[:,2:5])/2.0 #unit mass 
-    ke = ke.sum(axis=1).sum()
-    temp = 2.0/3/num*ke #unit kb = 1
-    temp = np.round(temp*eps/kb,decimals=3)
-    ke = np.round(ke*eps*j2ev,decimals=3)
-    pe = np.round(vTot*eps*j2ev,decimals=3)
+    vels[:,2:5] = vels[:,2:5]*100 #m/s
+    ke = 0
+    mx = 0
+    my = 0
+    mz = 0
+    for i in range(num):
+       if vels[i,1] == 1:
+           mass = mB*1.66054e-27
+       else:
+           mass = mN*1.66054e-27
+       ke = ke+(vels[i,2]**2+vels[i,3]**2+vels[i,4]**2)*mass/2
+       mx = mx+vels[i,2]*mass
+       my = my+vels[i,3]*mass
+       mz = mz+vels[i,4]*mass
+       
+    temp = ke/3/num/kbSI #unit kb = 1
+    temp = np.round(temp,decimals=3)
+    ke = np.round(ke,decimals=3)
+    pe = np.round(vTot,decimals=3)
     etot = np.round(ke+pe,decimals=3)
-    
-    mx = np.round(vels[:,2].sum()*mass*(eps/mass)**.5*1e12*1e10*1e12,decimals=3)
-    my = np.round(vels[:,3].sum()*mass*(eps/mass)**.5*1e12*1e10*1e12,decimals=3)
-    mz = np.round(vels[:,4].sum()*mass*(eps/mass)**.5*1e12*1e10*1e12,decimals=3)
-    # pg*ang/ps
+    mx = np.round(mx,decimals=3)
+    my = np.round(my,decimals=3)
+    mz = np.round(mz,decimals=3)
     
     if (k+1)%thermo == 0:
         if k+1 == thermo: #if the first step, erase the file. 
