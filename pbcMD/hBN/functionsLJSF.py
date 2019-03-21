@@ -23,13 +23,13 @@ eN = 0.001723 #eV
 eBN = np.sqrt(eB*eN) #eV
 sB = 3.4003 #A
 sN = 3.2177 #A 
-sBN = (sB+sN)/2 #A
+sBN = np.sqrt(sB*sN) #A
 kb = 8.6173303e-5 #eV/K
-mB = 10.811 #AMU
-mN = 14.0067 #AMU
+amu2kg = 1.66054e-27 
+mB = 10.811*amu2kg #AMU to kg
+mN = 14.0067*amu2kg #AMU to kg
 kbSI = 1.38064852e-23 #J/K
-
-amu2kg = 1.66054e-27
+j2eV = 6.241509e18
 
 def printParams(num,steps,dt,tTot):
     """
@@ -222,13 +222,14 @@ def vInit(pos,dist='constant',val=0):
         mass = 0
         for i in range(num):
             if pos[i,1] == 1:
-                vels[i,2:5] = vels[i,2:5]*np.sqrt(kbSI*val/mB*6.02214e26) #m/s
+                vels[i,2:5] = vels[i,2:5]*np.sqrt(kbSI*val/mB) #m/s
                 cmv = cmv+vels[i,2:5]*mB
                 mass = mass+mB
             else:
-                vels[i,2:5] = vels[i,2:5]*np.sqrt(kbSI*val/mN*6.02214e26) #m/s
+                vels[i,2:5] = vels[i,2:5]*np.sqrt(kbSI*val/mN) #m/s
                 cmv = cmv+vels[i,2:5]*mN
                 mass = mass+mN
+                
         cmv = cmv/mass
                 
         cmv = (mass*vels[:,2:5]).sum(axis=0)/(mass*num)
@@ -238,6 +239,23 @@ def vInit(pos,dist='constant',val=0):
         sys.exit('\n\tUSAGE ERROR: Give a valid velocity distribution\n')
     
     vels[:,2:5] = vels[:,2:5]/100 #angstom/ps
+    
+    
+    ### Print temp for debugging
+    num = len(vels[:,0])
+    vels2 = cp.deepcopy(vels)*100 #m/s
+    ke = 0
+    for i in range(num):
+       if vels2[i,1] == 1:
+           mass = mB
+       else:
+           mass = mN
+       ke = ke+(vels2[i,2]**2+vels2[i,3]**2+vels2[i,4]**2)*mass/2
+       
+    temp = 3*ke/num/kbSI #unit kb = 1
+    tempR = np.round(temp,decimals=3)
+    keR = np.round(j2eV*ke,decimals=3)
+    print('\t\tKE = '+str(keR)+'\t\tT = '+str(tempR))    
     return vels
 ##################
 
@@ -325,6 +343,7 @@ def vVerlet(num,pos,rcut,vels,fij,vlist,dt,box):
     
     Call within a loop to run MD simulation.
     """
+    c = 0.0001*1.60218e-19 #conver ps*eV/ang/kg to ang/ps
 
     ## Compute half step velocity
     for i in range(num): #loop over all atoms
@@ -333,7 +352,7 @@ def vVerlet(num,pos,rcut,vels,fij,vlist,dt,box):
         else:
            mass = mN
         for j in range(3): #loop over x y z
-            vels[i,j+2] = vels[i,j+2]+dt*fij[i,j+2]/2.0/mass
+            vels[i,j+2] = vels[i,j+2]+dt*c*fij[i,j+2]/2.0/mass
             #compute the velocity at the next half step for each atom in
             #x, y, and z
         
@@ -354,7 +373,7 @@ def vVerlet(num,pos,rcut,vels,fij,vlist,dt,box):
         else:
            mass = mN
         for j in range(3): #loop over x y z
-            vels[i,j+2] = vels[i,j+2]+dt*fij[i,j+2]/2.0/mass
+            vels[i,j+2] = vels[i,j+2]+dt*c*fij[i,j+2]/2.0/mass
             #compute the velocity at the next half step for each atom in
             #x, y, and z
             
@@ -449,7 +468,6 @@ def dump(k,dump,num,pos,types):
     The rest is behind the scenes.
     """
     cpos = cp.deepcopy(pos)
-    cpos[:,2:5] = cpos[:,2:5]
     
     if k+1 == dump: #if the first step, erase the file. 
         with open('traj.xyz','w') as fid: #write pos trajectory to file
@@ -482,46 +500,47 @@ def thermo(k,thermo,vels,vTot):
         
     Writes to file 'log.MD' with frequency thermo
     """
-#    j2ev = 6.242e18
     num = len(vels[:,0])
-    vels[:,2:5] = vels[:,2:5]*100 #m/s
+    vels2 = cp.deepcopy(vels)*100 #m/s
     ke = 0
     mx = 0
     my = 0
     mz = 0
     for i in range(num):
-       if vels[i,1] == 1:
-           mass = mB*1.66054e-27
+       if vels2[i,1] == 1:
+           mass = mB
        else:
-           mass = mN*1.66054e-27
-       ke = ke+(vels[i,2]**2+vels[i,3]**2+vels[i,4]**2)*mass/2
-       mx = mx+vels[i,2]*mass
-       my = my+vels[i,3]*mass
-       mz = mz+vels[i,4]*mass
+           mass = mN
+       ke = ke+(vels2[i,2]**2+vels2[i,3]**2+vels2[i,4]**2)*mass
+       mx = mx+vels2[i,2]*mass
+       my = my+vels2[i,3]*mass
+       mz = mz+vels2[i,4]*mass
        
-    temp = ke/3/num/kbSI #unit kb = 1
-    temp = np.round(temp,decimals=3)
-    ke = np.round(ke,decimals=3)
+#    temp = eV2J*ke/3/num/kbSI 
+    temp = ke/3/num/kbSI
+    tempR = np.round(temp,decimals=3)
+    keR = np.round(j2eV*ke,decimals=3)
     pe = np.round(vTot,decimals=3)
-    etot = np.round(ke+pe,decimals=3)
-    mx = np.round(mx,decimals=3)
-    my = np.round(my,decimals=3)
-    mz = np.round(mz,decimals=3)
+    etot = keR+pe
+    mxR = np.round(mx,decimals=3)
+    myR = np.round(my,decimals=3)
+    mzR = np.round(mz,decimals=3)
     
     if (k+1)%thermo == 0:
         if k+1 == thermo: #if the first step, erase the file. 
             with open('log.MD','w') as fid: #write energy to file
                 fid.write('STEP\tT\tKE\tPE\tE\tPx\tPy\tPz\n')
-                fid.write('----\tK\teV\teV\teV\tpgA/ps\tpgA/ps'
-                          '\tpgA/ps\n')
-                fid.write(str(k+1)+'\t'+str(temp)+'\t'+str(ke)+'\t'+
-                          str(pe)+'\t'+str(etot)+'\t'+str(mx)+'\t'+
-                          str(my)+'\t'+str(mz)+'\n')
+                fid.write('----\tK\teV\teV\teV\tkg.m/s\tkg.m/s'
+                          '\tkg.m/s\n')
+                fid.write(str(k+1)+'\t'+str(tempR)+'\t'+str(keR)+'\t'+
+                          str(pe)+'\t'+str(etot)+'\t'+str(mxR)+'\t'+
+                          str(myR)+'\t'+str(mzR)+'\n')
         else:
             with open('log.MD','a') as fid: #append energy to file
-                fid.write(str(k+1)+'\t'+str(temp)+'\t'+str(ke)+'\t'+
-                          str(pe)+'\t'+str(etot)+'\t'+str(mx)+'\t'+
-                          str(my)+'\t'+str(mz)+'\n')
+                fid.write(str(k+1)+'\t'+str(tempR)+'\t'+str(keR)+'\t'+
+                          str(pe)+'\t'+str(etot)+'\t'+str(mxR)+'\t'+
+                          str(myR)+'\t'+str(mzR)+'\n')
+    return ke, temp, mx, my, mz
 ########################################################################
                 
 #######################################################################
