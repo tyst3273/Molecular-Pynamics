@@ -13,7 +13,7 @@ import functionsLJSF as md
 
 ##### SIMULATION INPUTS #####
 infile = 'liquid256.xyz' #positions
-dump = 100
+dump = 5
 thermo = 10
 dist = 'mb' #velocity distribution
 val = 100 #Kelvin #argument for velocity sampling, see docstring

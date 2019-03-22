@@ -17,7 +17,7 @@ dump = 5
 thermo = 1
 dist = 'mb' #velocity distribution
 val = 300 #Kelvin #argument for velocity sampling, see docstring
-dt = 1e-6 #timestep in ps, nondimensionalized below
+dt = 1e-6 #timestep in ps
 tTot = .001 #ps 
    
 rcut = 7.5 #cut off distance in units of sigma, neighbor sphere

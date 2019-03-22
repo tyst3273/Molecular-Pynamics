@@ -196,14 +196,14 @@ def vInit(pos,dist='constant',val=0):
     
     elif dist == 'mb':
         num = len(pos[:,0])
-        if num%2 != 0:
-            num = num+1 #need an even number, will get rid of extra later
+#        if num%2 != 0:
+#            num = num+1 #need an even number, will get rid of extra later
             
         x1 = np.random.uniform(0,1,int(num*3/2))
         x2 = np.random.uniform(0,1,int(num*3/2))
         y1 = (kb*val/mass)**.5*(-2*np.log(x1))**.5*np.cos(2*np.pi*x2)
         y2 = (kb*val/mass)**.5*(-2*np.log(x1))**.5*np.sin(2*np.pi*x2)
-        num = len(pos[:,0])
+#        num = len(pos[:,0])
         vels[:,2:5] = np.reshape(np.append(y1,y2),(num,3))[0:num,:]
         
         cmv = (mass*vels[:,2:5]).sum(axis=0)/(mass*num)
