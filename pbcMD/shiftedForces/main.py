@@ -41,7 +41,6 @@ vels = md.vInit(pos,dist,val) #get initial velocites
 # Initialize verlet lists 
 vlist, vcoord = md.verletList(num,pos,rcut,box) #initialize verlet lists
 # Call function to initialize forces
-#fij, vij, vTot = md.fLJ(pos,num,vlist,box)
 fij, vij, vTot = md.fLJ_SF(pos,num,rcut,vlist,box)
 
 ###############################################################
