@@ -518,7 +518,7 @@ def thermo(k,thermo,vels,vTot,vir,box):
     j2ev = 6.242e18
     num = len(vels[:,0])
     ke = np.multiply(vels[:,2:5],vels[:,2:5])/2.0 #unit mass     
-    press = (2*ke.sum(axis=0)+vir)*eps/3/vol    
+    press = (2*ke.sum(axis=0)*mass/eps+vir)*eps/3/vol  
     press = np.round(press*1e-6,decimals=3)
     ke = ke.sum(axis=1).sum()
     temp = 2.0/3/num*ke #unit kb = 1
@@ -541,7 +541,7 @@ def thermo(k,thermo,vels,vTot,vir,box):
                 fid.write('STEP\t\tT\tKE\tPE\tE\tMx\tMy\tMz\tPxx'
                           '\tPyy\tPzz\n')
                 fid.write('----\t\tK\teV\teV\teV\tgm/s\tgm/s'
-                          '\tgm/s\tPa\tPa\tPa\n')
+                          '\tgm/s\tMPa\tMPa\tMPa\n')
                 fid.write(str(k+1)+'\t\t'+str(temp)+'\t'+str(ke)+'\t'+
                           str(pe)+'\t'+str(etot)+'\t'+str(mx)+'\t'+
                           str(my)+'\t'+str(mz)+'\t'+str(press[0])+'\t'+
