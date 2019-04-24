@@ -236,33 +236,40 @@ def fLJ_SF(pos,num,rcut,vlist,box):
     vc = 4*(1/rcut**12-1/rcut**6) #potential at cutoff
     dvdr = -48*((1/rcut)**13-0.5*(1/rcut**7)) #slope of potential at cutoff
     fc = (48/rcut**2*((1/rcut)**12-0.5*(1/rcut)**6)) #force at cutoff
-
+    
     fij = cp.deepcopy(pos) #to copy ids, types
     vij = cp.deepcopy(pos[:,0:3]) #to copy ids, types
     fij[:,2:5] = 0 #forces, same layout as pos and vels
     vij[:,2] = 0 #potential, same layout as pos and vels
+    vir = np.zeros((num,3)) #internal virial componenets
     
     for i in range(num):
         nd, rij = findRij(pos,vlist[i],box)
         numNN = len(vlist[i])
         tmpf = np.zeros((numNN,3)) #tmp array to store forces
         tmpv = np.zeros((1,numNN)) #tmp array to store PE
+        tmpvir = np.zeros((numNN,3)) #tmp array to strore vir components
         for j in range(numNN):
             if j == 0:
                 tmpf[j,:] = 0
                 tmpv[0,j] = 0
+                tmpvir[j,0] = 0
             else:
                 rv = rij[j,:]
                 rd = nd[j]
                 tmpf[j,:] = ((48/rd**2*((1/rd)**12-0.5*(1/rd)**6))-fc)*rv
                 # nondimensional
                 tmpv[0,j] = (4*((1/rd)**12-(1/rd)**6))-vc-(rd-rcut)*dvdr
+                tmpvir[j,:] = rv*tmpf[j,:]
+        
         fij[i,2:5] = tmpf.sum(axis=0) 
         vij[i,2] = tmpv.sum() 
+        vir[i,:] = tmpvir.sum(axis=0)
     vTot = vij[:,2].sum()/2.0 #total potential, dont double count
+    vir = vir.sum(axis=0)/2
             
     #nondimensional
-    return [fij, vij, vTot]
+    return [fij, vij, vTot, vir]
 #####################################
 
 ###################################
@@ -293,7 +300,7 @@ def vVerlet(num,pos,rcut,vels,fij,vlist,dt,box):
             #x, y, and z based on velocity at half step
             
     ## Update the forces for the new positions
-    fij, vij, vTot = fLJ_SF(pos,num,rcut,vlist,box)
+    fij, vij, vTot, vir = fLJ_SF(pos,num,rcut,vlist,box)
     
     ## Compute full step velocity
     for i in range(num): #loop over all atoms
@@ -304,6 +311,70 @@ def vVerlet(num,pos,rcut,vels,fij,vlist,dt,box):
             
     #nondimensional
     return [pos, vels, fij, vTot]
+##############################################
+
+###########################################33
+def computeEta(vels,val,tdamp,dt):
+    """
+    Computes the bath coupling term of the Nose-Hoover algortithm
+    """
+    tset = val*kb/eps
+    ## Compute system temp to check vs set point
+    num = len(vels[:,0])
+    ke = np.multiply(vels[:,2:5],vels[:,2:5])/2.0 #unit mass 
+    ke = ke.sum(axis=1).sum()
+    temp = 2.0/3/num*ke #unit kb = 1
+    
+    eta = dt/tdamp**2*(temp/tset-1)
+    
+    return eta
+############################################3    
+
+###################################
+def vvNoseHoover(num,pos,rcut,vels,fij,eta,val,vlist,dt,tdamp,box):
+    """
+    This function implements the Nose-Hoover thermostat to control the 
+    temperature. The velocity verlet algorithm is still used but is 
+    implemented using the equations of motion for the Nose-Hoover Hamiltonian.
+    
+    Use velocity verlet algorithm to update positions, velocities, and eta
+    given initial positions, velocities, forces, and the time step.
+    
+    Returns positions, velocities, forces, and eta at the next time step.
+    Also returns total potential energy each time step.
+    
+    Call within a loop to run MD simulation.
+    """
+    
+    ## Compute half step velocity
+    for i in range(num): #loop over all atoms
+        for j in range(3): #loop over x y z
+            vels[i,j+2] = vels[i,j+2]+dt*(fij[i,j+2]-eta*vels[i,j+2])/2.0
+            #compute the velocity at the next half step for each atom in
+            #x, y, and z
+        
+    ## Compute the next positions at full step from vhalf
+    for i in range(num): #loop over all atoms
+        for j in range(3): #loop over x y z
+            pos[i,j+2] = pos[i,j+2]+dt*vels[i,j+2]
+            #compute the position at the next full step for each atom in
+            #x, y, and z based on velocity at half step
+    
+    ## Compute the full step eta function
+    eta = eta+computeEta(vels,val,tdamp,dt)
+    
+    ## Update the forces for the new positions
+    fij, vij, vTot, vir = fLJ_SF(pos,num,rcut,vlist,box)
+    
+    ## Compute full step velocity
+    for i in range(num): #loop over all atoms
+        for j in range(3): #loop over x y z
+            vels[i,j+2] = (vels[i,j+2]+dt*fij[i,j+2]/2.0)/(1+eta*dt/2)
+            #compute the velocity at the next half step for each atom in
+            #x, y, and z
+            
+    #nondimensional
+    return [pos, vels, fij, eta, vTot, vir]
 ##############################################
     
 ##################################################
@@ -436,15 +507,19 @@ def dump(k,dump,num,pos,types):
 #####################################################################
             
 ###############################################################
-def thermo(k,thermo,vels,vTot):
+def thermo(k,thermo,vels,vTot,vir,box):
     """
     Computes Temp, KE, PE, Etot
         
     Writes to file 'log.MD' with frequency thermo
     """
+    box = box*sig*1e-10
+    vol = box[0]*box[1]*box[2]  #meters
     j2ev = 6.242e18
     num = len(vels[:,0])
-    ke = np.multiply(vels[:,2:5],vels[:,2:5])/2.0 #unit mass 
+    ke = np.multiply(vels[:,2:5],vels[:,2:5])/2.0 #unit mass     
+    press = (2*ke.sum(axis=0)+vir)*eps/3/vol    
+    press = np.round(press*1e-6,decimals=3)
     ke = ke.sum(axis=1).sum()
     temp = 2.0/3/num*ke #unit kb = 1
     temp = np.round(temp*eps/kb,decimals=3)
@@ -452,25 +527,31 @@ def thermo(k,thermo,vels,vTot):
     pe = np.round(vTot*eps*j2ev,decimals=3)
     etot = np.round(ke+pe,decimals=3)
     
-    mx = np.round(vels[:,2].sum()*mass*(eps/mass)**.5*1e12*1e10*1e12,decimals=3)
-    my = np.round(vels[:,3].sum()*mass*(eps/mass)**.5*1e12*1e10*1e12,decimals=3)
-    mz = np.round(vels[:,4].sum()*mass*(eps/mass)**.5*1e12*1e10*1e12,decimals=3)
+#    mx = np.round(vels[:,2].sum()*mass*(eps/mass)**.5*1e12*1e10*1e12,decimals=3)
+#    my = np.round(vels[:,3].sum()*mass*(eps/mass)**.5*1e12*1e10*1e12,decimals=3)
+#    mz = np.round(vels[:,4].sum()*mass*(eps/mass)**.5*1e12*1e10*1e12,decimals=3)
+    mx = np.round(vels[:,2].sum()*mass*(eps/mass)**.5*1e3,decimals=3)
+    my = np.round(vels[:,3].sum()*mass*(eps/mass)**.5*1e3,decimals=3)
+    mz = np.round(vels[:,4].sum()*mass*(eps/mass)**.5*1e3,decimals=3)
     # pg*ang/ps
     
     if (k+1)%thermo == 0:
         if k+1 == thermo: #if the first step, erase the file. 
             with open('log.MD','w') as fid: #write energy to file
-                fid.write('STEP\tT\tKE\tPE\tE\tPx\tPy\tPz\n')
-                fid.write('----\tK\teV\teV\teV\tpgA/ps\tpgA/ps'
-                          '\tpgA/ps\n')
-                fid.write(str(k+1)+'\t'+str(temp)+'\t'+str(ke)+'\t'+
+                fid.write('STEP\t\tT\tKE\tPE\tE\tMx\tMy\tMz\tPxx'
+                          '\tPyy\tPzz\n')
+                fid.write('----\t\tK\teV\teV\teV\tgm/s\tgm/s'
+                          '\tgm/s\tPa\tPa\tPa\n')
+                fid.write(str(k+1)+'\t\t'+str(temp)+'\t'+str(ke)+'\t'+
                           str(pe)+'\t'+str(etot)+'\t'+str(mx)+'\t'+
-                          str(my)+'\t'+str(mz)+'\n')
+                          str(my)+'\t'+str(mz)+'\t'+str(press[0])+'\t'+
+                          str(press[1])+'\t'+str(press[2])+'\n')
         else:
             with open('log.MD','a') as fid: #append energy to file
-                fid.write(str(k+1)+'\t'+str(temp)+'\t'+str(ke)+'\t'+
+                fid.write(str(k+1)+'\t\t'+str(temp)+'\t'+str(ke)+'\t'+
                           str(pe)+'\t'+str(etot)+'\t'+str(mx)+'\t'+
-                          str(my)+'\t'+str(mz)+'\n')
+                          str(my)+'\t'+str(mz)+'\t'+str(press[0])+'\t'+
+                          str(press[1])+'\t'+str(press[2])+'\n')
 ########################################################################
                 
 #######################################################################
