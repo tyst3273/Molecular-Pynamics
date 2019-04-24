@@ -5,6 +5,10 @@ Created on Fri Feb 22 10:41:01 2019
 Updated on Tues. Mar 5 2019
 Updated on Tues. Mar 10 2019 to include periodic boundaries, cut off distance
     for the force calculation, and Verlet lists.
+Updated on Wed. Apr 24 2019 to include Nose-Hoover thermostating and time-
+    integration based on the Nose-Hooover equations of motion
+
+This is GNU licensed so use it however you want but don't claim it as your own!
 
 @author: Ty Sterling
 ty.sterling@colorado.edu
@@ -25,9 +29,7 @@ rcut = 2.5 #cut off distance in units of sigma, neighbor sphere
 skin = 0.1 #verlet skin distance, units of sigma
 
 ###############################################################
-## You shouldn't have to change anything below here to run a
-## Simulation for a FCC argon using periodic boundary conditions,
-## Verlet lists, and cutoff LJ forces (NOT DONE WITH CUTOFF)
+## You shouldn't have to change anything below here to run MD
 ###############################################################
 ## Initial conditions for simulation
 
