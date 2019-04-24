@@ -540,8 +540,8 @@ def thermo(k,thermo,vels,vTot,vir,box):
             with open('log.MD','w') as fid: #write energy to file
                 fid.write('STEP\t\tT\tKE\tPE\tE\tMx\tMy\tMz\tPxx'
                           '\tPyy\tPzz\n')
-                fid.write('----\t\tK\teV\teV\teV\tgm/s\tgm/s'
-                          '\tgm/s\tMPa\tMPa\tMPa\n')
+                fid.write('----\t\tK\teV\teV\teV\tg*m/s\tg*m/s'
+                          '\tg*m/s\tMPa\tMPa\tMPa\n')
                 fid.write(str(k+1)+'\t\t'+str(temp)+'\t'+str(ke)+'\t'+
                           str(pe)+'\t'+str(etot)+'\t'+str(mx)+'\t'+
                           str(my)+'\t'+str(mz)+'\t'+str(press[0])+'\t'+
