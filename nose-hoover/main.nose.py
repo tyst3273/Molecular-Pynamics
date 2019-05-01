@@ -13,7 +13,7 @@ This is GNU licensed so use it however you want but don't claim it as your own!
 @author: Ty Sterling
 ty.sterling@colorado.edu
 """
-import functionsLJSF as md
+import functionsNose as md
 
 ##### SIMULATION INPUTS #####
 infile = 'liquid256.xyz' #positions
